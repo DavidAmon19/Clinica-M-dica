@@ -1,0 +1,27 @@
+[2025-08-28T13:51:14.571Z] ❌ Erro durante envio mockado: Invalid URL
+[2025-08-28T13:51:58.962Z] ❌ Erro durante envio mockado: Request failed with status code 404
+[2025-08-28T14:01:14.382Z] ❌ Erro durante envio mockado: Request failed with status code 404
+[2025-08-28T14:10:37.080Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T14:11:18.794Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T14:14:59.018Z] ⚠️ Contato 75988241772 não encontrado na base do SZ.chat
+[2025-08-28T14:17:15.588Z] ⚠️ Contato 5585992616996 não encontrado na base do SZ.chat
+[2025-08-28T14:20:47.512Z] ⚠️ Contato 5585992616996 não encontrado na base do SZ.chat
+[2025-08-28T14:27:41.969Z] ⚠️ Contato 5585992616996 não encontrado na base do SZ.chat
+[2025-08-28T14:28:37.222Z] ⚠️ Contato 5585992616996 não encontrado na base do SZ.chat
+[2025-08-28T14:34:15.691Z] ❌ Erro durante envio mockado: getForticsToken is not defined
+[2025-08-28T14:34:50.870Z] ❌ Erro durante envio mockado: Contato 5585992616996 não encontrado.
+[2025-08-28T14:35:12.706Z] ⚠️ Contato 5585992616996 não encontrado na base do SZ.chat
+[2025-08-28T14:45:58.000Z] ✅ [TESTE] Enviado para SIDA MAIA DOS SANTOS SOUSA (5585992616996) | Médico: APOLO CESAR ROCHA XAVIER | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 2025-08-30 09:00
+[2025-08-28T15:13:17.784Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T15:17:44.616Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T15:20:32.715Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T15:21:55.097Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T15:28:25.459Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T17:14:07.160Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T17:15:54.631Z] ❌ Erro durante envio mockado: Request failed with status code 422
+[2025-08-28T17:40:16.316Z] ✅ [TESTE] Enviado para SIDA MAIA DOS SANTOS SOUSA (5585992616996) | Médico: APOLO CESAR ROCHA XAVIER | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 2025-08-30 09:00
+[2025-08-28T18:05:08.807Z] ✅ [TESTE] Enviado para SIDA MAIA DOS SANTOS SOUSA (5585989197591) | Médico: APOLO CESAR ROCHA XAVIER | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 2025-08-30 09:00
+[2025-08-28T18:07:11.092Z] ❌ Erro durante envio mockado: hsmTemplate is not defined
+[2025-08-28T18:07:49.227Z] ❌ Erro durante envio mockado: hsmTemplate is not defined
+[2025-08-28T18:08:50.086Z] ✅ [TESTE] Enviado para SIDA MAIA DOS SANTOS SOUSA (5585989197591) | Médico: APOLO CESAR ROCHA XAVIER | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 2025-08-30 09:00
+[2025-08-28T18:21:17.791Z] ✅ [TESTE] Enviado para SIDA MAIA DOS SANTOS SOUSA (5585992616996) | Médico: APOLO CESAR ROCHA XAVIER | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 2025-08-30 09:00

@@ -1,0 +1,15 @@
+[2025-08-25T18:14:41.586Z] ✅ [TESTE] Enviado para ELIZABETE RIBEIRO BARBOSA DOS SANTOS (5585992616996) | Médico: ROBSON SOUZA SANTOS | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: Mon Aug 25 2025 00:00:00 GMT-0300 (Brasilia Standard Time) 07:12
+[2025-08-25T18:15:30.439Z] ✅ [TESTE] Enviado para ELIZABETE RIBEIRO BARBOSA DOS SANTOS (5585992616996) | Médico: ROBSON SOUZA SANTOS | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: Mon Aug 25 2025 00:00:00 GMT-0300 (Brasilia Standard Time) 07:12
+[2025-08-25T18:16:23.283Z] ✅ [TESTE] Enviado para ELIZABETE RIBEIRO BARBOSA DOS SANTOS (5585992616996) | Médico: ROBSON SOUZA SANTOS | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: Mon Aug 25 2025 00:00:00 GMT-0300 (Brasilia Standard Time) 07:12
+[2025-08-25T18:17:49.034Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T18:20:25.768Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T18:56:17.224Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T18:59:25.184Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:13:03.839Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:24:04.844Z] ❌ Erro durante envio mockado: close_session is not defined
+[2025-08-25T19:26:19.111Z] ❌ Erro durante envio mockado: agent is not defined
+[2025-08-25T19:32:07.121Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:34:12.778Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:34:57.933Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:37:42.710Z] ❌ Erro durante envio mockado: Request failed with status code 500
+[2025-08-25T19:59:43.278Z] ✅ [TESTE] Enviado para ELIZABETE RIBEIRO BARBOSA DOS SANTOS (5585992616996) | Médico: ROBSON SOUZA SANTOS | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: Mon Aug 25 2025 00:00:00 GMT-0300 (Brasilia Standard Time) 07:12

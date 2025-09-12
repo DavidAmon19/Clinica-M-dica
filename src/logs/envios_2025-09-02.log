@@ -1,0 +1,14 @@
+[2025-09-02T12:38:00.292Z] ❌ Erro geral: Dynamic SQL Error, SQL error code = -104, Token unknown - line 20, column 40, HOUR
+[2025-09-02T12:46:00.167Z] ❌ Erro geral: Dynamic SQL Error, SQL error code = -104, Database SQL dialect 1 does not support reference to TIME datatype
+[2025-09-02T12:51:00.248Z] ❌ Erro geral: conversion error from string "2021-06-15 00:00:00.0000 17:56:00"
+[2025-09-02T12:54:00.253Z] ❌ Erro geral: conversion error from string "2021-06-15 00:00:00.0000 17:56:00"
+[2025-09-02T12:56:00.383Z] ❌ Erro geral: conversion error from string "2007-02-01 0950:00"
+[2025-09-02T13:02:00.232Z] ❌ Erro geral: conversion error from string "2021-06-15 17::5:00"
+[2025-09-02T13:08:00.203Z] ❌ Erro geral: Dynamic SQL Error, SQL error code = -104, Database SQL dialect 1 does not support reference to TIME datatype
+[2025-09-02T13:24:00.237Z] ❌ Erro geral: conversion error from string ":5"
+[2025-09-02T14:12:00.194Z] ❌ Erro geral: Dynamic SQL Error, SQL error code = -104, Database SQL dialect 1 does not support reference to DATE datatype
+[2025-09-02T14:21:00.236Z] ❌ Erro geral: Dynamic SQL Error, SQL error code = -104, Database SQL dialect 1 does not support reference to DATE datatype
+[2025-09-02T14:26:00.190Z] Total de agendamentos para notificar: 1
+[2025-09-02T14:26:06.878Z] ✅ Enviado para LUZIA MARIA RAMOS DOS SANTOS LEAL (5575988437673) | Médico: RESSONANCIA MAGNETICA - ESPECIALIDADES | Procedimento: RESSONANCIA MAGNETICA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 04/09/2025 09:00
+[2025-09-02T14:36:00.261Z] Total de agendamentos para notificar: 1
+[2025-09-02T14:36:04.481Z] ✅ Enviado para LUZIA MARIA RAMOS DOS SANTOS LEAL (5575988437673) | Médico: RESSONANCIA MAGNETICA - ESPECIALIDADES | Procedimento: RESSONANCIA MAGNETICA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 04/09/2025 09:00

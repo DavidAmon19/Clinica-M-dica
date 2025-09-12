@@ -1,0 +1,41 @@
+[2025-09-05T12:19:00.204Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:19:01.713Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:23:00.194Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:23:02.025Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:25:00.204Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:25:02.310Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:27:00.263Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:27:02.222Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:31:00.195Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:31:02.069Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:34:00.212Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:34:00.276Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:34:01.866Z] ❌ Erro geral: Request failed with status code 401
+[2025-09-05T12:34:02.068Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:36:00.194Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:36:01.945Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T12:55:00.193Z] Total de agendamentos para notificar: 1
+[2025-09-05T12:55:02.163Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T14:26:00.203Z] Total de agendamentos para notificar: 1
+[2025-09-05T14:26:02.032Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T14:33:00.240Z] Total de agendamentos para notificar: 1
+[2025-09-05T14:33:01.889Z] ❌ Erro geral: Request failed with status code 422
+[2025-09-05T14:35:00.220Z] Total de agendamentos para notificar: 1
+[2025-09-05T14:35:02.008Z] ❌ Erro geral: AxiosError: Request failed with status code 422
+[2025-09-05T14:54:00.173Z] Total de agendamentos para notificar: 1
+[2025-09-05T14:54:00.177Z] ⚠️ Contato não encontrado: 
+[2025-09-05T14:58:00.214Z] Total de agendamentos para notificar: 1
+[2025-09-05T14:58:03.792Z] 📌 Contato atualizado: 68a8ba5d3d71a4848601a44f com campos {"DATA":"05/09/2025","PROCEDIMENTO":"ORTOPEDIA E TRAUMATOLOGIA","LOCAL":"CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO","CODIGO":"1993916","HORA":"09:30","MEDICO":"ANDRE LUIZ MACHADO SILVA"}
+[2025-09-05T14:58:05.598Z] ✅ Enviado para Paciente (5585992616996) | Procedimento: ORTOPEDIA E TRAUMATOLOGIA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 05/09/2025 09:30
+[2025-09-05T17:01:00.195Z] Total de agendamentos para notificar: 1
+[2025-09-05T17:01:02.894Z] 📌 Contato atualizado: 68a8ba5d3d71a4848601a44f com campos {"DATA":"05/09/2025","PROCEDIMENTO":"ORTOPEDIA E TRAUMATOLOGIA","LOCAL":"CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO","CODIGO":"1993916","HORA":"09:30","MEDICO":"ANDRE LUIZ MACHADO SILVA"}
+[2025-09-05T17:01:04.648Z] ✅ Enviado para Paciente (5585992616996) | Procedimento: ORTOPEDIA E TRAUMATOLOGIA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 05/09/2025 09:30
+[2025-09-05T17:45:00.240Z] Total de agendamentos para notificar: 1
+[2025-09-05T17:45:03.108Z] 📌 Contato atualizado: 68a8ba5d3d71a4848601a44f com campos {"DATA":"05/09/2025","PROCEDIMENTO":"ORTOPEDIA E TRAUMATOLOGIA","LOCAL":"CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO","CODIGO":"1993916","HORA":"09:30","MEDICO":"ANDRE LUIZ MACHADO SILVA"}
+[2025-09-05T17:45:04.079Z] ✅ Enviado para Paciente (5585992616996) | Procedimento: ORTOPEDIA E TRAUMATOLOGIA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 05/09/2025 09:30
+[2025-09-05T17:51:00.198Z] Total de agendamentos para notificar: 1
+[2025-09-05T17:51:04.075Z] 📌 Contato atualizado: 68a8ba5d3d71a4848601a44f com campos {"DATA":"05/09/2025","PROCEDIMENTO":"ORTOPEDIA E TRAUMATOLOGIA","LOCAL":"CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO","CODIGO":"1993916","HORA":"09:30","MEDICO":"ANDRE LUIZ MACHADO SILVA"}
+[2025-09-05T17:51:05.589Z] ✅ Enviado para Paciente (5585992616996) | Procedimento: ORTOPEDIA E TRAUMATOLOGIA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 05/09/2025 09:30
+[2025-09-05T18:58:00.203Z] Total de agendamentos para notificar: 1
+[2025-09-05T18:58:03.837Z] 📌 Contato atualizado: 68aa62c78ea62c92940f8c6f com campos {"DATA":"05/09/2025","PROCEDIMENTO":"ORTOPEDIA E TRAUMATOLOGIA","LOCAL":"CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO","CODIGO":"1993916","HORA":"09:30","MEDICO":"ANDRE LUIZ MACHADO SILVA"}
+[2025-09-05T18:58:04.993Z] ✅ Enviado para Paciente (5585989197591) | Procedimento: ORTOPEDIA E TRAUMATOLOGIA | Local: CENTRO DE ESPECIALIDADES HOSPITAL ORTOPÉDICO | Data: 05/09/2025 09:30
