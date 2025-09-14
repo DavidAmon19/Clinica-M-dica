@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { queryDB } = require('../utils/db');
 const { sendHSM } = require('../integrations/fortics');
-const { updateContactSZ, getContactByPhone } = require('../integrations/sz');
+const { updateContactSZ, getOrCreateContact } = require('../integrations/sz');
 
 function formatPhoneNumber(raw) {
   if (!raw) return '';
@@ -49,79 +49,85 @@ WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
     for (const r of rows) {
       // const celular = formatPhoneNumber(r.mar_cel);
       const celular = "5575982064309"
-      const contactId = await getContactByPhone(celular);
-
-      if (!contactId) {
-        logLine(`⚠️ Contato não encontrado: ${celular}`);
-        continue;
-      }
-
-      console.log(r, 'da um olhada aqui')
-      const nomePaciente = r.mar_nome || 'Paciente';
-      const unidade = r.local_nome || 'Unidade';
-      const procedimento = r.esp_nome || 'Procedimento';
-      const dataBR = r.mar_data.toLocaleDateString('pt-BR');
-      const hora = r.mar_hora || '';
-      const codigo = String(r.mar_codigo);
-
-      const hsmTemplate = process.env.FORTICS_TEMPLATE_HSM_EXAME;
-
-      let campos = {
-        DATA: dataBR,
-        PROCEDIMENTO: procedimento,
-        LOCAL: unidade,
-        CODIGO: codigo,
-        ...(hora && { HORA: hora }),
-        ...(r.mar_esp !== 36 && r.medico_nome && { MEDICO: r.medico_nome })
-      };
-
-
-      if (hora) campos.HORA = hora;
-
-      if (r.mar_esp !== 36 && r.medico_nome) {
-        campos.MEDICO = r.medico_nome;
-      }
+      const nomePaciente = r.nome_paciente || 'Paciente';
 
       try {
-        console.log(`[DEBUG] Atualizando contato (${contactId}) com os campos:`);
-        console.dir(campos, { depth: null });
+        const contactId = await getOrCreateContact(celular, nomePaciente);
+        
+        if (!contactId) {
+          logLine(`❌ Não foi possível obter/criar contato: ${celular}`);
+          continue;
+        }
 
-        await updateContactSZ(contactId, campos);
+        console.log(r, 'da um olhada aqui')
+        const unidade = r.local_nome || 'Unidade';
+        const procedimento = r.esp_nome || 'Procedimento';
+        const dataBR = r.mar_data.toLocaleDateString('pt-BR');
+        const hora = r.mar_hora || '';
+        const codigo = String(r.mar_codigo);
 
-        logLine(`📌 Contato atualizado: ${contactId} com campos ${JSON.stringify(campos)}`);
+        const hsmTemplate = process.env.FORTICS_TEMPLATE_HSM_EXAME;
+
+        let campos = {
+          DATA: dataBR,
+          PROCEDIMENTO: procedimento,
+          LOCAL: unidade,
+          CODIGO: codigo,
+          ...(hora && { HORA: hora }),
+          ...(r.mar_esp !== 36 && r.medico_nome && { MEDICO: r.medico_nome })
+        };
+
+        if (hora) campos.HORA = hora;
+
+        if (r.mar_esp !== 36 && r.medico_nome) {
+          campos.MEDICO = r.medico_nome;
+        }
+
+        try {
+          console.log(`[DEBUG] Atualizando contato (${contactId}) com os campos:`);
+          console.dir(campos, { depth: null });
+
+          await updateContactSZ(contactId, campos);
+
+          logLine(`📌 Contato atualizado: ${contactId} com campos ${JSON.stringify(campos)}`);
+        } catch (err) {
+          console.error(`[ERRO] Falha ao atualizar contato ${contactId}:`, err.message);
+          logLine(`❌ Erro ao atualizar contato ${contactId} - ${err.message}`);
+          continue;
+        }
+
+        // await new Promise((r) => setTimeout(r, 200));
+
+        try {
+          await sendHSM({
+            to: celular,
+            agent_id: process.env.FORTICS_AGENT_ID,
+            channel_id: process.env.FORTICS_CHANNEL_ID,
+            close_session: 3,
+            agent: process.env.FORTICS_AGENT,
+            type: "text",
+            is_hsm: 1,
+            deviceToken: process.env.FORTICS_AGENT_DEVICE,
+            attendance_id: process.env.FORTICS_ATTENDANCE,
+            hsm_template_name: hsmTemplate
+          });
+
+          logLine(`✅ Enviado para ${nomePaciente} (${celular}) | Procedimento: ${procedimento} | Local: ${unidade} | Data: ${dataBR} ${hora}`);
+
+          await queryDB(`
+            UPDATE MARCACAO
+               SET MAR_CONFIRMACAO = CURRENT_TIMESTAMP
+             WHERE MAR_CODIGO = ?
+          `, [r.mar_codigo]);
+
+        } catch (err) {
+          console.error(`[PRODUÇÃO] Erro ao enviar para ${celular}:`, err.message);
+          logLine(`❌ Falha ao enviar para ${celular} - ${err.message}`);
+        }
+        
       } catch (err) {
-        console.error(`[ERRO] Falha ao atualizar contato ${contactId}:`, err.message);
-        logLine(`❌ Erro ao atualizar contato ${contactId} - ${err.message}`);
-        continue;
-      }
-
-      // await new Promise((r) => setTimeout(r, 200));
-
-      try {
-        await sendHSM({
-          to: celular,
-          agent_id: process.env.FORTICS_AGENT_ID,
-          channel_id: process.env.FORTICS_CHANNEL_ID,
-          close_session: 3,
-          agent: process.env.FORTICS_AGENT,
-          type: "text",
-          is_hsm: 1,
-          deviceToken: process.env.FORTICS_AGENT_DEVICE,
-          attendance_id: process.env.FORTICS_ATTENDANCE,
-          hsm_template_name: hsmTemplate
-        });
-
-        logLine(`✅ Enviado para ${nomePaciente} (${celular}) | Procedimento: ${procedimento} | Local: ${unidade} | Data: ${dataBR} ${hora}`);
-
-        await queryDB(`
-          UPDATE MARCACAO
-             SET MAR_CONFIRMACAO = CURRENT_TIMESTAMP
-           WHERE MAR_CODIGO = ?
-        `, [r.mar_codigo]);
-
-      } catch (err) {
-        console.error(`[PRODUÇÃO] Erro ao enviar para ${celular}:`, err.message);
-        logLine(`❌ Falha ao enviar para ${celular} - ${err.message}`);
+        console.error(`[PRODUÇÃO] Erro ao processar contato ${celular}:`, err.message);
+        logLine(`❌ Erro geral ao processar ${celular} - ${err.message}`);
       }
     }
   } catch (err) {
