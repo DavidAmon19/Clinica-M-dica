@@ -37,7 +37,7 @@ async function sendHSM({ to,agent_id,channel_id,close_session,agent,type,is_hsm,
       token = await refresh();
 
       const { data } = await axios.post(
-        'https://hortopedico.sz.chat/api/v4/messages/send',
+        'https://hortopedico.sz.chat/api/v4/message/send',
         body,
         {
           headers: {
