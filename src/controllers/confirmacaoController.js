@@ -1,10 +1,29 @@
 const { queryDB } = require('../utils/db');
 
-async function confirmarPresenca(req, res) {
-  const mar_codigo = req.body.codigo;
+const STATUS_WHATSAPP = {
+  CONFIRMADO_WHATSAPP: 41,       // Confirmado WhatsApp
+  CANCELADO_WHATSAPP: 42,        // Cancelado WhatsApp
+  REMARCADO_WHATSAPP: 43,        // Remarcado WhatsApp
+  MENSAGEM_ENVIADA: 44,          // Whatsapp Enviado
+};
+
+const ACOES = {
+  CONFIRMAR: 'confirmar',
+  CANCELAR: 'cancelar',
+  REAGENDAR: 'reagendar'
+};
+
+async function processarAcaoWhatsapp(req, res) {
+  const { codigo, acao, motivo, nova_data, nova_hora } = req.body;
   
-  if (!mar_codigo) {
+  if (!codigo) {
     return res.status(400).json({ error: 'Código da marcação é obrigatório.' });
+  }
+
+  if (!acao || !Object.values(ACOES).includes(acao)) {
+    return res.status(400).json({ 
+      error: 'Ação inválida. Use: confirmar, cancelar ou reagendar' 
+    });
   }
 
   try {
@@ -12,71 +31,176 @@ async function confirmarPresenca(req, res) {
       SELECT
         M.MAR_CODIGO,
         M.MAR_HORA,
+        M.MAR_DATA,
         M.MAR_ESP,
         M.MAR_LIGOU,
+        TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
         TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
         TRIM(CAST(CAST(L.LOC_NOME  AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME
       FROM MARCACAO M
       LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
       LEFT JOIN LOCAL  L  ON L.LOC_CODIGO = M.MAR_LOCAL
       WHERE M.MAR_CODIGO = ?
-    `, [mar_codigo]);
+    `, [codigo]);
 
     if (!marcacao) {
       return res.status(404).json({ error: 'Agendamento não encontrado.' });
     }
 
-    if (marcacao.mar_ligou === 0) {
-      const retorno = {
-        hora: Buffer.isBuffer(marcacao.mar_hora)
-          ? marcacao.mar_hora.toString('utf8')
-          : (marcacao.mar_hora || ''),
-        endereco: marcacao.local_nome || 'Endereço não disponível'
-      };
-
-      if (marcacao.mar_esp !== 36 && marcacao.medico_nome) {
-        retorno.medico = marcacao.medico_nome;
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: 'Sua presença já havia sido confirmada anteriormente! Obrigado',
-        ja_confirmado: true,
-        dados: retorno
-      });
+    switch (acao) {
+      case ACOES.CONFIRMAR:
+        return await confirmarPresenca(marcacao, res);
+      
+      case ACOES.CANCELAR:
+        return await cancelarAgendamento(marcacao, motivo, res);
+      
+      case ACOES.REAGENDAR:
+        return await reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, res);
+      
+      default:
+        return res.status(400).json({ error: 'Ação não implementada.' });
     }
-
-    await queryDB(`
-      UPDATE MARCACAO
-         SET MAR_LIGOU = 0
-       WHERE MAR_CODIGO = ?
-    `, [mar_codigo]);
-
-    const retorno = {
-      hora: Buffer.isBuffer(marcacao.mar_hora)
-        ? marcacao.mar_hora.toString('utf8')
-        : (marcacao.mar_hora || ''),
-      endereco: marcacao.local_nome || 'Endereço não disponível'
-    };
-
-    if (marcacao.mar_esp !== 36 && marcacao.medico_nome) {
-      retorno.medico = marcacao.medico_nome;
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Sua presença foi confirmada com sucesso! Obrigado',
-      dados: retorno,
-      debug: {
-        status_anterior: marcacao.mar_ligou,
-        status_atual: 0
-      }
-    });
 
   } catch (err) {
-    console.error('Erro ao confirmar presença:', err.message);
-    return res.status(500).json({ error: 'Erro interno ao processar confirmação.' });
+    console.error(`Erro ao processar ação ${acao}:`, err.message);
+    return res.status(500).json({ error: 'Erro interno ao processar solicitação.' });
   }
 }
 
-module.exports = { confirmarPresenca };
+async function confirmarPresenca(marcacao, res) {
+  if (marcacao.mar_ligou === STATUS_WHATSAPP.CONFIRMADO_WHATSAPP) {
+    const retorno = montarRetornoConfirmacao(marcacao);
+    return res.status(200).json({
+      success: true,
+      message: 'Sua presença já havia sido confirmada anteriormente! Obrigado',
+      ja_confirmado: true,
+      dados: retorno
+    });
+  }
+
+  if ([STATUS_WHATSAPP.CANCELADO_WHATSAPP, STATUS_WHATSAPP.REMARCADO_WHATSAPP].includes(marcacao.mar_ligou)) {
+    const statusText = marcacao.mar_ligou === STATUS_WHATSAPP.CANCELADO_WHATSAPP ? 'cancelado' : 'remarcado';
+    return res.status(400).json({
+      error: `Este agendamento foi ${statusText} e não pode ser confirmado.`,
+      status_atual: marcacao.mar_ligou
+    });
+  }
+
+  await queryDB(`
+    UPDATE MARCACAO
+       SET MAR_LIGOU = ?
+     WHERE MAR_CODIGO = ?
+  `, [STATUS_WHATSAPP.CONFIRMADO_WHATSAPP, marcacao.mar_codigo]);
+
+  const retorno = montarRetornoConfirmacao(marcacao);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Sua presença foi confirmada com sucesso! Obrigado',
+    dados: retorno,
+    debug: {
+      status_anterior: marcacao.mar_ligou,
+      status_atual: STATUS_WHATSAPP.CONFIRMADO_WHATSAPP
+    }
+  });
+}
+
+async function cancelarAgendamento(marcacao, motivo, res) {
+  if (marcacao.mar_ligou === STATUS_WHATSAPP.CANCELADO_WHATSAPP) {
+    return res.status(400).json({
+      error: 'Este agendamento já foi cancelado anteriormente.',
+      ja_cancelado: true
+    });
+  }
+
+  await queryDB(`
+    UPDATE MARCACAO
+       SET MAR_LIGOU = ?
+     WHERE MAR_CODIGO = ?
+  `, [STATUS_WHATSAPP.CANCELADO_WHATSAPP, marcacao.mar_codigo]);
+
+  console.log(`[CANCELAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Motivo: ${motivo || 'Não informado'}`);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Agendamento cancelado com sucesso via WhatsApp.',
+    dados: {
+      codigo: marcacao.mar_codigo,
+      paciente: marcacao.nome_paciente,
+      data: marcacao.mar_data,
+      motivo: motivo || null
+    },
+    debug: {
+      status_anterior: marcacao.mar_ligou,
+      status_atual: STATUS_WHATSAPP.CANCELADO_WHATSAPP
+    }
+  });
+}
+
+async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, res) {
+  if (marcacao.mar_ligou === STATUS_WHATSAPP.REMARCADO_WHATSAPP) {
+    return res.status(400).json({
+      error: 'Este agendamento já foi remarcado anteriormente.',
+      ja_remarcado: true
+    });
+  }
+
+  let updateQuery = 'UPDATE MARCACAO SET MAR_LIGOU = ?';
+  let params = [STATUS_WHATSAPP.REMARCADO_WHATSAPP];
+
+  if (nova_data) {
+    updateQuery += ', MAR_DATA = ?';
+    params.push(nova_data);
+  }
+
+  if (nova_hora) {
+    updateQuery += ', MAR_HORA = ?';
+    params.push(nova_hora);
+  }
+
+  updateQuery += ' WHERE MAR_CODIGO = ?';
+  params.push(marcacao.mar_codigo);
+
+  await queryDB(updateQuery, params);
+
+  console.log(`[REAGENDAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Nova data: ${nova_data || 'não informada'} - Motivo: ${motivo || 'Não informado'}`);
+
+  return res.status(200).json({
+    success: true,
+    message: 'Agendamento reagendado com sucesso via WhatsApp.',
+    dados: {
+      codigo: marcacao.mar_codigo,
+      paciente: marcacao.nome_paciente,
+      data_anterior: marcacao.mar_data,
+      hora_anterior: marcacao.mar_hora,
+      nova_data: nova_data || marcacao.mar_data,
+      nova_hora: nova_hora || marcacao.mar_hora,
+      motivo: motivo || null
+    },
+    debug: {
+      status_anterior: marcacao.mar_ligou,
+      status_atual: STATUS_WHATSAPP.REMARCADO_WHATSAPP
+    }
+  });
+}
+
+function montarRetornoConfirmacao(marcacao) {
+  const retorno = {
+    hora: Buffer.isBuffer(marcacao.mar_hora)
+      ? marcacao.mar_hora.toString('utf8')
+      : (marcacao.mar_hora || ''),
+    endereco: marcacao.local_nome || 'Endereço não disponível'
+  };
+
+  if (marcacao.mar_esp !== 36 && marcacao.medico_nome) {
+    retorno.medico = marcacao.medico_nome;
+  }
+
+  return retorno;
+}
+
+module.exports = { 
+  processarAcaoWhatsapp,
+  STATUS_WHATSAPP,
+  ACOES
+};

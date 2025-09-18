@@ -5,6 +5,15 @@ const { queryDB } = require('../utils/db');
 const { sendHSM } = require('../integrations/fortics');
 const { updateContactSZ, getOrCreateContact } = require('../integrations/sz');
 
+const STATUS_WHATSAPP = {
+  PODE_ENVIAR: [null, 1, 40],    // NULL, Confirmado, Whatsapp
+  MENSAGEM_ENVIADA: 44,          // Whatsapp Enviado
+  CONFIRMADO_WHATSAPP: 41,       // Confirmado WhatsApp
+  CANCELADO_WHATSAPP: 42,        // Cancelado WhatsApp
+  REMARCADO_WHATSAPP: 43,        // Remarcado WhatsApp
+  NAO_ENVIAR: [2, 5, 42, 43]     // Cancelado, Desmarcado, Cancelado/Remarcado WhatsApp
+};
+
 function formatPhoneNumber(raw) {
   if (!raw) return '';
   const cleaned = raw.replace(/\D/g, '');
@@ -20,36 +29,44 @@ cron.schedule('58 15 * * *', async () => {
 
   try {
     const rows = await queryDB(`
-       SELECT
-  FIRST 1
-  M.MAR_CODIGO,
-  M.MAR_MEDICO,
-  M.MAR_DATA,
-  TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
-  TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
-  TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS MAR_CEL,
-  M.MAR_CONFIRMACAO,
-  M.MAR_CHEGADA,
-  M.MAR_ESP,
-  TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
-  TRIM(CAST(CAST(L.LOC_NOME  AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
-  TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESP_NOME
-FROM MARCACAO M
-LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
-LEFT JOIN LOCAL  L  ON L.LOC_CODIGO = M.MAR_LOCAL
-LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
-WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
-  AND M.MAR_DATA <= DATEADD(3 DAY TO CAST('TODAY' AS DATE))
-
+      SELECT
+        FIRIST 1
+        M.MAR_CODIGO,
+        M.MAR_MEDICO,
+        M.MAR_DATA,
+        M.MAR_LIGOU,
+        TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
+        TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
+        TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS MAR_CEL,
+        M.MAR_ESP,
+        TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
+        TRIM(CAST(CAST(L.LOC_NOME  AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
+        TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESP_NOME
+      FROM MARCACAO M
+      LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
+      LEFT JOIN LOCAL  L  ON L.LOC_CODIGO = M.MAR_LOCAL
+      LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
+      WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
+        AND M.MAR_DATA <= DATEADD(3 DAY TO CAST('TODAY' AS DATE))
+        AND (M.MAR_LIGOU IS NULL OR M.MAR_LIGOU IN (1, 40))
+        AND M.MAR_LIGOU NOT IN (44, 41, 42, 43, 2, 5)
     `);
 
     console.log(`[PRODUÇÃO] Total de agendamentos encontrados: ${rows.length}`);
     logLine(`Total de agendamentos para notificar: ${rows.length}`);
 
     for (const r of rows) {
+      if (!STATUS_WHATSAPP.PODE_ENVIAR.includes(r.mar_ligou)) {
+        console.log(`[SKIP] Agendamento ${r.mar_codigo} - Status: ${r.mar_ligou} não permite envio`);
+        logLine(`⏭️ Pulado ${r.mar_codigo} - Status: ${r.mar_ligou}`);
+        continue;
+      }
+
       // const celular = formatPhoneNumber(r.mar_cel);
-      const celular = "5575982064309"
+      const celular = "5585992616996"
       const nomePaciente = r.nome_paciente || 'Paciente';
+
+      console.log(`[PROCESSANDO] ${r.mar_codigo} - Status atual: ${r.mar_ligou} - Paciente: ${nomePaciente}`);
 
       try {
         const contactId = await getOrCreateContact(celular, nomePaciente);
@@ -59,7 +76,6 @@ WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
           continue;
         }
 
-        console.log(r, 'da um olhada aqui')
         const unidade = r.local_nome || 'Unidade';
         const procedimento = r.esp_nome || 'Procedimento';
         const dataBR = r.mar_data.toLocaleDateString('pt-BR');
@@ -77,26 +93,17 @@ WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
           ...(r.mar_esp !== 36 && r.medico_nome && { MEDICO: r.medico_nome })
         };
 
-        if (hora) campos.HORA = hora;
-
-        if (r.mar_esp !== 36 && r.medico_nome) {
-          campos.MEDICO = r.medico_nome;
-        }
-
         try {
           console.log(`[DEBUG] Atualizando contato (${contactId}) com os campos:`);
           console.dir(campos, { depth: null });
 
           await updateContactSZ(contactId, campos);
-
           logLine(`📌 Contato atualizado: ${contactId} com campos ${JSON.stringify(campos)}`);
         } catch (err) {
           console.error(`[ERRO] Falha ao atualizar contato ${contactId}:`, err.message);
           logLine(`❌ Erro ao atualizar contato ${contactId} - ${err.message}`);
           continue;
         }
-
-        // await new Promise((r) => setTimeout(r, 200));
 
         try {
           await sendHSM({
@@ -112,13 +119,14 @@ WHERE M.MAR_DATA >= CAST('TODAY' AS DATE)
             hsm_template_name: hsmTemplate
           });
 
-          logLine(`✅ Enviado para ${nomePaciente} (${celular}) | Procedimento: ${procedimento} | Local: ${unidade} | Data: ${dataBR} ${hora}`);
-
           await queryDB(`
             UPDATE MARCACAO
-               SET MAR_CONFIRMACAO = CURRENT_TIMESTAMP
+               SET MAR_LIGOU = ?
              WHERE MAR_CODIGO = ?
-          `, [r.mar_codigo]);
+          `, [STATUS_WHATSAPP.MENSAGEM_ENVIADA, r.mar_codigo]);
+
+          logLine(`✅ Enviado para ${nomePaciente} (${celular}) | Status: ${r.mar_ligou} → ${STATUS_WHATSAPP.MENSAGEM_ENVIADA} | Procedimento: ${procedimento} | Local: ${unidade} | Data: ${dataBR} ${hora}`);
+          console.log(`[SUCESSO] Mensagem enviada e status atualizado para ${STATUS_WHATSAPP.MENSAGEM_ENVIADA}`);
 
         } catch (err) {
           console.error(`[PRODUÇÃO] Erro ao enviar para ${celular}:`, err.message);
