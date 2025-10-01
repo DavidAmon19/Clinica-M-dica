@@ -18,6 +18,7 @@ const servicoMedicoRoutes = require('./src/routes/servicoMedico');
 const marcacaoRoutes = require('./src/routes/marcacao');
 const cancelarRoutes = require('./src/routes/cancelar');
 const forticsWebhook = require('./src/routes/forticsWebhook');
+const dashboardRoutes = require('./src/routes/dashboardRoutes');
 
 app.use('/api', express.json({limit: '2mb'}), forticsWebhook);
 app.use('/api/medico', medicoRoutes);
@@ -29,6 +30,7 @@ app.use('/api', servicoMedicoRoutes);
 app.use('/api', marcacaoRoutes);         
 app.use('/api', cancelarRoutes);      
 app.use('/api', confirmacaoRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 
 app.get('/', (_req, res) => res.send('API Clínica rodando'));
