@@ -15,7 +15,7 @@ const ACOES = {
 
 async function processarAcaoWhatsapp(req, res) {
   const { codigo, acao, motivo, nova_data, nova_hora } = req.body;
-  
+
   if (!codigo) {
     return res.status(400).json({ error: 'Código da marcação é obrigatório.' });
   }
@@ -52,13 +52,13 @@ async function processarAcaoWhatsapp(req, res) {
     switch (acao) {
       case ACOES.CONFIRMAR:
         return await confirmarPresenca(marcacao, res);
-      
+
       case ACOES.CANCELAR:
         return await cancelarAgendamento(marcacao, motivo, res);
-      
+
       case ACOES.REAGENDAR:
         return await reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, res);
-      
+
       default:
         return res.status(400).json({ error: 'Ação não implementada.' });
     }
@@ -70,29 +70,13 @@ async function processarAcaoWhatsapp(req, res) {
 }
 
 async function confirmarPresenca(marcacao, res) {
-  const data = marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '';
-  const hora = Buffer.isBuffer(marcacao.mar_hora)
-    ? marcacao.mar_hora.toString('utf8')
-    : (marcacao.mar_hora || '');
-  const local = marcacao.local_nome || '';
-  const medico = marcacao.medico_nome || '';
-  const endereco = marcacao.local_endereco || '';
-  const link = extrairLinkDoEndereco(endereco);
-  const enderecoSanitizado = removeLocalizacao(endereco);
+  
 
   if (marcacao.mar_ligou === STATUS_WHATSAPP.CONFIRMADO_WHATSAPP) {
-    let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
-    mensagem += '_Sua presença já havia sido confirmada anteriormente._\n\n';
+    let ePrimeiraConfirmacao = false;
+    const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao);
     
-    if (data) mensagem += `📅 *Data:* ${data}\n`;
-    if (hora) mensagem += `⏰ *Horário:* ${hora}\n`;
-    if (marcacao.mar_esp !== 36 && medico) mensagem += `👨‍⚕️ *Médico:* ${medico}\n`;
-    if (local) mensagem += `🏥 *Local:* ${local}\n`;
-    if (enderecoSanitizado) mensagem += `📍 *Endereço:* ${enderecoSanitizado}\n`;
-    if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
-    mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
-    
-    return res.status(200).send(mensagem);
+    return res.status(200).send(mensagemConfirmacao);
   }
 
   if ([STATUS_WHATSAPP.CANCELADO_WHATSAPP, STATUS_WHATSAPP.REMARCADO_WHATSAPP].includes(marcacao.mar_ligou)) {
@@ -108,18 +92,11 @@ async function confirmarPresenca(marcacao, res) {
   `, [STATUS_WHATSAPP.CONFIRMADO_WHATSAPP, marcacao.mar_codigo]);
 
   console.log(`[CONFIRMAÇÃO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Status: ${marcacao.mar_ligou} → ${STATUS_WHATSAPP.CONFIRMADO_WHATSAPP}`);
-
-  let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
   
-  if (data) mensagem += `📅 *Data:* ${data}\n`;
-  if (hora) mensagem += `⏰ *Horário:* ${hora}\n`;
-  if (marcacao.mar_esp !== 36 && medico) mensagem += `👨‍⚕️ *Médico:* ${medico}\n`;
-  if (local) mensagem += `🏥 *Local:* ${local}\n`;
-  if (endereco) mensagem += `📍 *Endereço:* ${endereco}\n`;
-  if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
-  mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
+  let ePrimeiraConfirmacao = true;
+  const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao);
 
-  return res.status(200).send(mensagem);
+  return res.status(200).send(mensagemConfirmacao);
 }
 
 async function cancelarAgendamento(marcacao, motivo, res) {
@@ -214,39 +191,6 @@ function extrairLinkDoEndereco(endereco) {
   return null;
 }
 
-function montarRetornoConfirmacao(marcacao) {
-  const retorno = {
-    data: marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '',
-    hora: Buffer.isBuffer(marcacao.mar_hora)
-      ? marcacao.mar_hora.toString('utf8')
-      : (marcacao.mar_hora || ''),
-    local: marcacao.local_nome || 'Local não disponível'
-  };
-
-  if (marcacao.local_endereco) {
-    retorno.endereco = marcacao.local_endereco;
-    
-    const link = extrairLinkDoEndereco(marcacao.local_endereco);
-    if (link) {
-      retorno.link_localizacao = link;
-    }
-  } else {
-    retorno.endereco = 'Endereço não disponível';
-  }
-
-  if (marcacao.local_mapa) {
-    const srcMatch = marcacao.local_mapa.match(/src="([^"]+)"/);
-    if (srcMatch && srcMatch[1]) {
-      retorno.mapa_google = srcMatch[1];
-    }
-  }
-
-  if (marcacao.mar_esp !== 36 && marcacao.medico_nome) {
-    retorno.medico = marcacao.medico_nome;
-  }
-
-  return retorno;
-}
 
 function removeLocalizacao(endereco){
    const index = endereco.toLowerCase().indexOf("localização");
@@ -254,6 +198,34 @@ function removeLocalizacao(endereco){
       return endereco.substring(0, index).trim();
     }
     return endereco;
+}
+
+function gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao) {
+  const data = marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '';
+  const hora = Buffer.isBuffer(marcacao.mar_hora)
+    ? marcacao.mar_hora.toString('utf8')
+    : (marcacao.mar_hora || '');
+  const local = marcacao.local_nome || '';
+  const medico = marcacao.medico_nome || '';
+  const endereco = marcacao.local_endereco || '';
+  const link = extrairLinkDoEndereco(endereco);
+  const enderecoSemLocalizacao = removeLocalizacao(endereco)
+
+  let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
+  
+  if(!ePrimeiraConfirmacao){
+    mensagem += '_Sua presença já havia sido confirmada anteriormente._\n\n';
+  }
+
+  if (data) mensagem += `📅 *Data:* ${data}\n`;
+  if (hora) mensagem += `⏰ *Horário:* ${hora}\n`;
+  if (marcacao.mar_esp !== 36 && medico) mensagem += `👨‍⚕️ *Médico:* ${medico}\n`;
+  if (local) mensagem += `🏥 *Local:* ${local}\n`;
+  if (enderecoSemLocalizacao) mensagem += `📍 *Endereço:* ${enderecoSemLocalizacao}\n`;
+  if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
+  mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
+
+  return mensagem
 }
 
 module.exports = { 
