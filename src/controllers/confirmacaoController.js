@@ -36,7 +36,9 @@ async function processarAcaoWhatsapp(req, res) {
         M.MAR_LIGOU,
         TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
         TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
-        TRIM(CAST(CAST(L.LOC_NOME  AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME
+        TRIM(CAST(CAST(L.LOC_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
+        TRIM(CAST(CAST(L.LOC_ENDERECO AS VARCHAR(250) CHARACTER SET OCTETS) AS VARCHAR(250) CHARACTER SET WIN1252)) AS LOCAL_ENDERECO,
+        TRIM(CAST(CAST(L.LOC_MAPA AS VARCHAR(1000) CHARACTER SET OCTETS) AS VARCHAR(1000) CHARACTER SET WIN1252)) AS LOCAL_MAPA
       FROM MARCACAO M
       LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
       LEFT JOIN LOCAL  L  ON L.LOC_CODIGO = M.MAR_LOCAL
@@ -68,22 +70,35 @@ async function processarAcaoWhatsapp(req, res) {
 }
 
 async function confirmarPresenca(marcacao, res) {
+  const data = marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '';
+  const hora = Buffer.isBuffer(marcacao.mar_hora)
+    ? marcacao.mar_hora.toString('utf8')
+    : (marcacao.mar_hora || '');
+  const local = marcacao.local_nome || '';
+  const medico = marcacao.medico_nome || '';
+  const endereco = marcacao.local_endereco || '';
+  const link = extrairLinkDoEndereco(endereco);
+  const enderecoSanitizado = removeLocalizacao(endereco);
+
   if (marcacao.mar_ligou === STATUS_WHATSAPP.CONFIRMADO_WHATSAPP) {
-    const retorno = montarRetornoConfirmacao(marcacao);
-    return res.status(200).json({
-      success: true,
-      message: 'Sua presença já havia sido confirmada anteriormente! Obrigado',
-      ja_confirmado: true,
-      dados: retorno
-    });
+    let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
+    mensagem += '_Sua presença já havia sido confirmada anteriormente._\n\n';
+    
+    if (data) mensagem += `📅 *Data:* ${data}\n`;
+    if (hora) mensagem += `⏰ *Horário:* ${hora}\n`;
+    if (marcacao.mar_esp !== 36 && medico) mensagem += `👨‍⚕️ *Médico:* ${medico}\n`;
+    if (local) mensagem += `🏥 *Local:* ${local}\n`;
+    if (enderecoSanitizado) mensagem += `📍 *Endereço:* ${enderecoSanitizado}\n`;
+    if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
+    mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
+    
+    return res.status(200).send(mensagem);
   }
 
   if ([STATUS_WHATSAPP.CANCELADO_WHATSAPP, STATUS_WHATSAPP.REMARCADO_WHATSAPP].includes(marcacao.mar_ligou)) {
     const statusText = marcacao.mar_ligou === STATUS_WHATSAPP.CANCELADO_WHATSAPP ? 'cancelado' : 'remarcado';
-    return res.status(400).json({
-      error: `Este agendamento foi ${statusText} e não pode ser confirmado.`,
-      status_atual: marcacao.mar_ligou
-    });
+    const mensagem = `❌ *Não foi possível confirmar*\n\nEste agendamento foi ${statusText} anteriormente e não pode ser confirmado.\n\nPor favor, entre em contato com a recepção para mais informações.`;
+    return res.status(400).send(mensagem);
   }
 
   await queryDB(`
@@ -92,17 +107,19 @@ async function confirmarPresenca(marcacao, res) {
      WHERE MAR_CODIGO = ?
   `, [STATUS_WHATSAPP.CONFIRMADO_WHATSAPP, marcacao.mar_codigo]);
 
-  const retorno = montarRetornoConfirmacao(marcacao);
+  console.log(`[CONFIRMAÇÃO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Status: ${marcacao.mar_ligou} → ${STATUS_WHATSAPP.CONFIRMADO_WHATSAPP}`);
 
-  return res.status(200).json({
-    success: true,
-    message: 'Sua presença foi confirmada com sucesso! Obrigado',
-    dados: retorno,
-    debug: {
-      status_anterior: marcacao.mar_ligou,
-      status_atual: STATUS_WHATSAPP.CONFIRMADO_WHATSAPP
-    }
-  });
+  let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
+  
+  if (data) mensagem += `📅 *Data:* ${data}\n`;
+  if (hora) mensagem += `⏰ *Horário:* ${hora}\n`;
+  if (marcacao.mar_esp !== 36 && medico) mensagem += `👨‍⚕️ *Médico:* ${medico}\n`;
+  if (local) mensagem += `🏥 *Local:* ${local}\n`;
+  if (endereco) mensagem += `📍 *Endereço:* ${endereco}\n`;
+  if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
+  mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
+
+  return res.status(200).send(mensagem);
 }
 
 async function cancelarAgendamento(marcacao, motivo, res) {
@@ -184,19 +201,59 @@ async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, 
   });
 }
 
+function extrairLinkDoEndereco(endereco) {
+  if (!endereco) return null;
+  
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = endereco.match(urlRegex);
+  
+  if (matches && matches.length > 0) {
+    return matches[0];
+  }
+  
+  return null;
+}
+
 function montarRetornoConfirmacao(marcacao) {
   const retorno = {
+    data: marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '',
     hora: Buffer.isBuffer(marcacao.mar_hora)
       ? marcacao.mar_hora.toString('utf8')
       : (marcacao.mar_hora || ''),
-    endereco: marcacao.local_nome || 'Endereço não disponível'
+    local: marcacao.local_nome || 'Local não disponível'
   };
+
+  if (marcacao.local_endereco) {
+    retorno.endereco = marcacao.local_endereco;
+    
+    const link = extrairLinkDoEndereco(marcacao.local_endereco);
+    if (link) {
+      retorno.link_localizacao = link;
+    }
+  } else {
+    retorno.endereco = 'Endereço não disponível';
+  }
+
+  if (marcacao.local_mapa) {
+    const srcMatch = marcacao.local_mapa.match(/src="([^"]+)"/);
+    if (srcMatch && srcMatch[1]) {
+      retorno.mapa_google = srcMatch[1];
+    }
+  }
 
   if (marcacao.mar_esp !== 36 && marcacao.medico_nome) {
     retorno.medico = marcacao.medico_nome;
   }
 
   return retorno;
+}
+
+function removeLocalizacao(endereco){
+   const index = endereco.toLowerCase().indexOf("localização");
+    if (index !== -1) {
+      return endereco.substring(0, index).trim();
+    }
+    return endereco;
 }
 
 module.exports = { 

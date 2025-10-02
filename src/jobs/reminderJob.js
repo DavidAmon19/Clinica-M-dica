@@ -37,12 +37,12 @@ function getTargetDate() {
     case 4: 
       targetDate.setDate(today.getDate() + 1);
       break;
-    case 5:
+    case 5: 
       return {
         single: false,
         dates: [
           new Date(today.getTime() + 24 * 60 * 60 * 1000), 
-          new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
+          new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) 
         ]
       };
     case 0: 
@@ -75,19 +75,21 @@ function buildQuery() {
   
   if (targetInfo.single) {
     const targetDateStr = targetInfo.date.toISOString().split('T')[0];
-    whereClause = `WHERE M.MAR_DATA = CAST('${targetDateStr}' AS DATE)`;
+    whereClause = `WHERE M.MAR_DATA = CAST('${targetDateStr}' AS DATE) AND M.MAR_CADASTRO IS NOT NULL`;
   } else {
     const date1 = targetInfo.dates[0].toISOString().split('T')[0];
     const date2 = targetInfo.dates[1].toISOString().split('T')[0];
-    whereClause = `WHERE (M.MAR_DATA = CAST('${date1}' AS DATE) OR M.MAR_DATA = CAST('${date2}' AS DATE))`;
+    whereClause = `WHERE (M.MAR_DATA = CAST('${date1}' AS DATE) OR M.MAR_DATA = CAST('${date2}' AS DATE)) AND M.MAR_CADASTRO IS NOT NULL`;
   }
   
   return `
   SELECT
+  FIRST 1
     M.MAR_CODIGO,
     M.MAR_MEDICO,
     M.MAR_DATA,
     M.MAR_LIGOU,
+    M.MAR_CADASTRO,
     TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
     TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
     TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS MAR_CEL,
@@ -104,7 +106,7 @@ function buildQuery() {
 `;
 }
 
-cron.schedule('00 07 * * *', async () => {
+cron.schedule('12 16 * * *', async () => {
   console.log(`[PRODUÇÃO] Iniciando verificação diária de agendamentos...`);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -134,8 +136,8 @@ cron.schedule('00 07 * * *', async () => {
   try {
     const rows = await queryDB(query);
 
-    console.log(`[PRODUÇÃO] Total de agendamentos encontrados: ${rows.length}`);
-    logLine(`Total de agendamentos para notificar: ${rows.length}`);
+    console.log(`[PRODUÇÃO] Total de agendamentos encontrados (com MAR_CADASTRO válido): ${rows.length}`);
+    logLine(`Total de agendamentos válidos para notificar: ${rows.length}`);
 
     if (rows.length > 0) {
       const datesProcessed = [...new Set(rows.map(r => r.mar_data.toLocaleDateString('pt-BR')))];
@@ -165,8 +167,8 @@ cron.schedule('00 07 * * *', async () => {
         logLine(`⚠️ Nome vazio para código ${r.mar_codigo}, usando 'Paciente'`);
       }
 
-      const celular = formatPhoneNumber(r.mar_cel);
-      // const celular ="5585992616996"; // Número de teste
+      // const celular = formatPhoneNumber(r.mar_cel);
+      const celular ="5585989924921"; // Número de teste
 
       // if (!celular || celular.length < 13 || !r.mar_cel) {
       //   console.log(`[SKIP] Agendamento ${r.mar_codigo} - Telefone inválido: "${r.mar_cel}"`);
@@ -174,7 +176,7 @@ cron.schedule('00 07 * * *', async () => {
       //   continue;
       // }
 
-      console.log(`[PROCESSANDO] ${r.mar_codigo} - Data: ${r.mar_data.toLocaleDateString('pt-BR')} - Status atual: ${r.mar_ligou} - Paciente: ${nomePaciente} - Telefone: ${celular}`);
+      console.log(`[PROCESSANDO] ${r.mar_codigo} - Data: ${r.mar_data.toLocaleDateString('pt-BR')} - Status atual: ${r.mar_ligou} - Paciente: ${nomePaciente} - Telefone: ${celular} - Cadastro: ${r.mar_cadastro ? 'VÁLIDO' : 'INVÁLIDO'}`);
 
       try {
         const contactId = await getOrCreateContact(celular, nomePaciente);
