@@ -5,12 +5,16 @@ const {
   getConfirmations, 
   getCharts, 
   getProcedures,
-  resetStatusAgendamento 
+  resetStatusAgendamento,
+  getConfirmedWithValidSend 
 } = require('../controllers/dashboarController');
 
 router.get('/metrics', getMetrics);
 
 router.get('/confirmations', getConfirmations);
+
+router.get('/confirmations/validadas', getConfirmedWithValidSend);
+
 
 router.get('/charts', getCharts);
 

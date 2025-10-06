@@ -22,7 +22,9 @@ async function getMetrics(req, res) {
     const dataFim = data_fim || new Date().toISOString().split('T')[0];
     const dataInicio = data_inicio || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-    let whereConditions = [`M.MAR_DATA BETWEEN CAST('${dataInicio}' AS DATE) AND CAST('${dataFim}' AS DATE)`];
+    let whereConditions = [
+      `M.MAR_DATA BETWEEN CAST('${dataInicio}' AS DATE) AND CAST('${dataFim}' AS DATE)`
+    ];
 
     if (especialidade) whereConditions.push(`M.MAR_ESP = ${especialidade}`);
     if (medico) whereConditions.push(`M.MAR_MEDICO = ${medico}`);
@@ -31,42 +33,64 @@ async function getMetrics(req, res) {
     const whereClause = whereConditions.join(' AND ');
 
     const metricsQuery = `
-  SELECT
-    COUNT(*) as total_agendamentos,
-    COUNT(CASE WHEN M.MAR_LIGOU = 44 THEN 1 ELSE NULL END) as mensagens_enviadas,
-    COUNT(CASE WHEN M.MAR_LIGOU IN (1, 41) THEN 1 ELSE NULL END) as confirmados,
-    COUNT(CASE WHEN M.MAR_LIGOU = 42 THEN 1 ELSE NULL END) as cancelados,
-    COUNT(CASE WHEN M.MAR_LIGOU = 43 THEN 1 ELSE NULL END) as remarcados,
-    COUNT(CASE WHEN (M.MAR_LIGOU IS NULL OR M.MAR_LIGOU = 0 OR M.MAR_LIGOU = 1 OR M.MAR_LIGOU = 40) THEN 1 ELSE NULL END) as pendentes
-  FROM MARCACAO M
-  WHERE ${whereClause}
-`;
+      SELECT
+        COUNT(*) as total_agendamentos,
+        COUNT(CASE WHEN M.MAR_LIGOU = 44 THEN 1 ELSE NULL END) as mensagens_enviadas,
+        COUNT(
+          CASE 
+            WHEN M.MAR_LIGOU = 41 
+              AND EXISTS (
+                SELECT 1 FROM MARCACAO M2
+                WHERE M2.MAR_CODIGO = M.MAR_CODIGO
+                  AND M2.MAR_LIGOU = 44
+                  AND M2.MAR_DATA = M.MAR_DATA
+              )
+            THEN 1 ELSE NULL 
+          END
+        ) as confirmados,
+        COUNT(CASE WHEN M.MAR_LIGOU = 42 THEN 1 ELSE NULL END) as cancelados,
+        COUNT(CASE WHEN M.MAR_LIGOU = 43 THEN 1 ELSE NULL END) as remarcados,
+        COUNT(CASE WHEN (M.MAR_LIGOU IS NULL OR M.MAR_LIGOU IN (0, 1, 40)) THEN 1 ELSE NULL END) as pendentes
+      FROM MARCACAO M
+      WHERE ${whereClause}
+    `;
 
-const totalRealQuery = `
-  SELECT COUNT(*) as total_real_agendamentos
-  FROM MARCACAO M
-  WHERE ${whereClause}
-    AND M.MAR_LIGOU NOT IN (2, 3, 5, 12, 99)
-`;
+    const totalRealQuery = `
+      SELECT COUNT(*) as total_real_agendamentos
+      FROM MARCACAO M
+      WHERE ${whereClause}
+        AND M.MAR_LIGOU NOT IN (2, 3, 5, 12, 99)
+    `;
 
-const [totalReal] = await queryDB(totalRealQuery);
-
+    const [totalReal] = await queryDB(totalRealQuery);
     const [metrics] = await queryDB(metricsQuery);
 
     const taxa_envio = metrics.total_agendamentos > 0 ?
       (metrics.mensagens_enviadas / metrics.total_agendamentos) * 100 : 0;
+
     const confirmados_whatsapp = metrics.confirmados;
     const taxa_confirmacao = metrics.mensagens_enviadas > 0 ?
       (confirmados_whatsapp / metrics.mensagens_enviadas) * 100 : 0;
 
     const taxa_confirmacao_final = Math.min(taxa_confirmacao, 100);
 
-    const dailyQuery = `
+   const dailyQuery = `
   SELECT
     M.MAR_DATA as data,
     COUNT(*) as total,
     COUNT(CASE WHEN M.MAR_LIGOU = 44 THEN 1 ELSE NULL END) as enviadas,
-    COUNT(CASE WHEN M.MAR_LIGOU = 41 THEN 1 ELSE NULL END) as confirmadas,
+    COUNT(
+      CASE 
+        WHEN M.MAR_LIGOU = 41 
+          AND EXISTS (
+            SELECT 1 FROM MARCACAO M2
+            WHERE M2.MAR_CODIGO = M.MAR_CODIGO
+              AND M2.MAR_LIGOU = 44
+              AND M2.MAR_DATA = M.MAR_DATA
+          )
+        THEN 1 ELSE NULL 
+      END
+    ) as confirmadas,
     COUNT(CASE WHEN M.MAR_LIGOU = 42 THEN 1 ELSE NULL END) as canceladas
   FROM MARCACAO M
   WHERE M.MAR_DATA BETWEEN CAST('${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}' AS DATE) 
@@ -75,9 +99,8 @@ const [totalReal] = await queryDB(totalRealQuery);
   ORDER BY M.MAR_DATA DESC
 `;
 
-    const dailyStats = await queryDB(dailyQuery);
 
-    const diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+    const dailyStats = await queryDB(dailyQuery);
 
     res.json({
       success: true,
@@ -94,7 +117,7 @@ const [totalReal] = await queryDB(totalRealQuery);
           remarcados: parseInt(metrics.remarcados) || 0,
           pendentes: parseInt(metrics.pendentes) || 0,
           taxa_envio: parseFloat(taxa_envio.toFixed(1)) || 0,
-          taxa_confirmacao: parseFloat(taxa_confirmacao.toFixed(1)) || 0
+          taxa_confirmacao: parseFloat(taxa_confirmacao_final.toFixed(1)) || 0
         },
         estatisticas_diarias: dailyStats.map(day => ({
           data: day.data.toISOString().split('T')[0],
@@ -112,9 +135,6 @@ const [totalReal] = await queryDB(totalRealQuery);
 
   } catch (error) {
     console.error('ERRO DETALHADO:', error);
-    console.error('Stack trace:', error.stack);
-    console.error('Message:', error.message);
-
     res.status(500).json({
       success: false,
       error: 'Erro interno ao obter métricas do dashboard',
@@ -122,6 +142,7 @@ const [totalReal] = await queryDB(totalRealQuery);
     });
   }
 }
+
 
 async function getConfirmations(req, res) {
   try {
@@ -508,12 +529,138 @@ async function resetStatusAgendamento(req, res) {
   }
 }
 
+async function getConfirmedWithValidSend(req, res) {
+  try {
+    const {
+      data_inicio,
+      data_fim,
+      page = 1,
+      limit = 50,
+      search
+    } = req.query;
+
+    const dataFim = data_fim || new Date().toISOString().split('T')[0];
+    const dataInicio = data_inicio || new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    let whereConditions = [
+      `M.MAR_LIGOU = 41`,
+      `M.MAR_DATA BETWEEN CAST('${dataInicio}' AS DATE) AND CAST('${dataFim}' AS DATE)`,
+      `EXISTS (
+        SELECT 1 FROM MARCACAO M2
+        WHERE M2.MAR_CODIGO = M.MAR_CODIGO
+          AND M2.MAR_LIGOU = 44
+          AND M2.MAR_DATA = M.MAR_DATA
+      )`
+    ];
+
+    if (search) {
+      whereConditions.push(`(
+        UPPER(TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252))) LIKE UPPER('%${search}%')
+        OR CAST(M.MAR_CODIGO AS VARCHAR) LIKE '%${search}%'
+        OR TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) LIKE '%${search}%'
+      )`);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const query = `
+      SELECT FIRST ${limit} SKIP ${offset}
+        M.MAR_CODIGO,
+        M.MAR_DATA,
+        TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
+        TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
+        TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS TELEFONE,
+        M.MAR_LIGOU,
+        TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
+        TRIM(CAST(CAST(L.LOC_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
+        TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESPECIALIDADE_NOME
+      FROM MARCACAO M
+      LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
+      LEFT JOIN LOCAL L ON L.LOC_CODIGO = M.MAR_LOCAL
+      LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
+      WHERE ${whereClause}
+      ORDER BY M.MAR_DATA DESC, M.MAR_HORA DESC
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM MARCACAO M
+      WHERE ${whereClause}
+    `;
+
+    const [result, countResult] = await Promise.all([
+      queryDB(query),
+      queryDB(countQuery)
+    ]);
+
+    const total = countResult[0]?.total || 0;
+    const totalPages = Math.ceil(total / parseInt(limit));
+
+    const mapearStatus = (status) => {
+      const statusMap = {
+        41: 'Confirmado',
+        42: 'Cancelado',
+        43: 'Remarcado',
+        44: 'Enviado',
+        0: 'Agendado',
+        1: 'Confirmado',
+        40: 'WhatsApp',
+        null: 'Pendente'
+      };
+      return statusMap[status] || 'Desconhecido';
+    };
+
+    const formatted = result.map(conf => ({
+      codigo: conf.mar_codigo,
+      data: conf.mar_data.toISOString().split('T')[0],
+      hora: conf.mar_hora || '',
+      paciente: conf.nome_paciente || 'Nome não informado',
+      telefone: conf.telefone || '',
+      status: conf.mar_ligou,
+      status_texto: mapearStatus(conf.mar_ligou),
+      medico: conf.medico_nome || '',
+      local: conf.local_nome || '',
+      especialidade: conf.especialidade_nome || ''
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        confirmations: formatted,
+        pagination: {
+          current_page: parseInt(page),
+          per_page: parseInt(limit),
+          total: parseInt(total),
+          total_pages: totalPages,
+          has_next: parseInt(page) < totalPages,
+          has_prev: parseInt(page) > 1
+        },
+        filtros: {
+          data_inicio: dataInicio,
+          data_fim: dataFim,
+          search
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Erro ao obter confirmações validadas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro interno ao obter confirmações validadas'
+    });
+  }
+}
+
+
 module.exports = {
   getMetrics,
   getConfirmations,
   getCharts,
   getProcedures,
-  resetStatusAgendamento
+  resetStatusAgendamento,
+  getConfirmedWithValidSend
 };
 
 

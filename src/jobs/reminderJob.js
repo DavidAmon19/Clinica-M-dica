@@ -4,6 +4,7 @@ const path = require('path');
 const { queryDB } = require('../utils/db');
 const { sendHSM } = require('../integrations/fortics');
 const { updateContactSZ, getOrCreateContact } = require('../integrations/sz');
+const { console } = require('inspector/promises');
 
 const STATUS_WHATSAPP = {
   MENSAGEM_ENVIADA: 44,          // Whatsapp Enviado
@@ -66,7 +67,7 @@ function getTargetDate() {
 
 function buildQuery() {
   const targetInfo = getTargetDate();
-  
+  console.log('[DEBUG] targetInfo:', targetInfo.date); 
   if (!targetInfo.single && targetInfo.dates.length === 0) {
     return null;
   }
@@ -84,7 +85,6 @@ function buildQuery() {
   
   return `
   SELECT
-  FIRST 1
     M.MAR_CODIGO,
     M.MAR_MEDICO,
     M.MAR_DATA,
@@ -106,7 +106,7 @@ function buildQuery() {
 `;
 }
 
-cron.schedule('12 16 * * *', async () => {
+cron.schedule('30 07 * * *', async () => {
   console.log(`[PRODUÇÃO] Iniciando verificação diária de agendamentos...`);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -167,8 +167,8 @@ cron.schedule('12 16 * * *', async () => {
         logLine(`⚠️ Nome vazio para código ${r.mar_codigo}, usando 'Paciente'`);
       }
 
-      // const celular = formatPhoneNumber(r.mar_cel);
-      const celular ="5585989924921"; // Número de teste
+      const celular = formatPhoneNumber(r.mar_cel);
+      // const celular ="5585989924921"; // Número de teste
 
       // if (!celular || celular.length < 13 || !r.mar_cel) {
       //   console.log(`[SKIP] Agendamento ${r.mar_codigo} - Telefone inválido: "${r.mar_cel}"`);
