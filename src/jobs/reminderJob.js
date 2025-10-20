@@ -21,33 +21,33 @@ function formatPhoneNumber(raw) {
 
 function getTargetDate() {
   const today = new Date();
-  const dayOfWeek = today.getDay(); 
-  
+  const dayOfWeek = today.getDay();
+
   let targetDate = new Date(today);
-  
-  switch(dayOfWeek) {
-    case 1: 
+
+  switch (dayOfWeek) {
+    case 1:
       targetDate.setDate(today.getDate() + 1);
       break;
-    case 2: 
+    case 2:
       targetDate.setDate(today.getDate() + 1);
       break;
-    case 3: 
+    case 3:
       targetDate.setDate(today.getDate() + 1);
       break;
-    case 4: 
+    case 4:
       targetDate.setDate(today.getDate() + 1);
       break;
-    case 5: 
+    case 5:
       return {
         single: false,
         dates: [
-          new Date(today.getTime() + 24 * 60 * 60 * 1000), 
-          new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) 
+          new Date(today.getTime() + 24 * 60 * 60 * 1000),
+          new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)
         ]
       };
-    case 0: 
-    case 6: 
+    case 0:
+    case 6:
       return {
         single: false,
         dates: []
@@ -58,7 +58,7 @@ function getTargetDate() {
         dates: []
       };
   }
-  
+
   return {
     single: true,
     date: targetDate
@@ -67,24 +67,73 @@ function getTargetDate() {
 
 function buildQuery() {
   const targetInfo = getTargetDate();
-  console.log('[DEBUG] targetInfo:', targetInfo.date); 
+  console.log('[DEBUG] targetInfo:', targetInfo.date);
   if (!targetInfo.single && targetInfo.dates.length === 0) {
     return null;
   }
-  
+
   let whereClause = '';
-  
+
   if (targetInfo.single) {
     const targetDateStr = targetInfo.date.toISOString().split('T')[0];
-    whereClause = `WHERE M.MAR_DATA = CAST('${targetDateStr}' AS DATE) AND M.MAR_CADASTRO IS NOT NULL`;
+    whereClause = `WHERE M.MAR_DATA = CAST('${targetDateStr}' AS DATE) AND M.MAR_CADASTRO IS NOT NULL AND M.MAR_LIGOU <> 2`;
   } else {
     const date1 = targetInfo.dates[0].toISOString().split('T')[0];
     const date2 = targetInfo.dates[1].toISOString().split('T')[0];
-    whereClause = `WHERE (M.MAR_DATA = CAST('${date1}' AS DATE) OR M.MAR_DATA = CAST('${date2}' AS DATE)) AND M.MAR_CADASTRO IS NOT NULL`;
+    whereClause = `WHERE (M.MAR_DATA = CAST('${date1}' AS DATE) OR M.MAR_DATA = CAST('${date2}' AS DATE)) AND M.MAR_CADASTRO IS NOT NULL AND M.MAR_LIGOU <> 2`;
   }
-  
+  // AND M.MAR_MEDICO = 109
   return `
+   SELECT
+     M.MAR_CODIGO,
+     M.MAR_MEDICO,
+     M.MAR_DATA,
+     M.MAR_LIGOU,
+     M.MAR_CADASTRO,
+     TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
+     TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
+     TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS MAR_CEL,
+     M.MAR_ESP,
+     TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
+     TRIM(CAST(CAST(L.LOC_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
+     TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESP_NOME
+   FROM MARCACAO M
+   LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
+   LEFT JOIN LOCAL L ON L.LOC_CODIGO = M.MAR_LOCAL
+   LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
+   ${whereClause}
+   ORDER BY M.MAR_DATA, M.MAR_HORA
+ `;
+}
+//   return `
+//   SELECT
+//     M.MAR_CODIGO,
+//     M.MAR_MEDICO,
+//     M.MAR_DATA,
+//     M.MAR_LIGOU,
+//     M.MAR_CADASTRO,
+//     TRIM(CAST(CAST(M.MAR_HORA AS VARCHAR(5) CHARACTER SET OCTETS) AS VARCHAR(5) CHARACTER SET WIN1252)) AS MAR_HORA,
+//     TRIM(CAST(CAST(M.MAR_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS NOME_PACIENTE,
+//     TRIM(CAST(CAST(M.MAR_TELEFONE AS VARCHAR(20) CHARACTER SET OCTETS) AS VARCHAR(20) CHARACTER SET WIN1252)) AS MAR_CEL,
+//     M.MAR_ESP,
+//     TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
+//     TRIM(CAST(CAST(L.LOC_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
+//     TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESP_NOME
+//   FROM MARCACAO M
+//   LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
+//   LEFT JOIN LOCAL L ON L.LOC_CODIGO = M.MAR_LOCAL
+//   LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
+//   ${whereClause}
+//   ORDER BY M.MAR_DATA, M.MAR_HORA
+// `;
+// }
+
+
+/*Para teste
+
+return `
   SELECT
+    FIRST 1
     M.MAR_CODIGO,
     M.MAR_MEDICO,
     M.MAR_DATA,
@@ -97,16 +146,22 @@ function buildQuery() {
     TRIM(CAST(CAST(DC.MED_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS MEDICO_NOME,
     TRIM(CAST(CAST(L.LOC_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS LOCAL_NOME,
     TRIM(CAST(CAST(E.ESP_NOME AS VARCHAR(120) CHARACTER SET OCTETS) AS VARCHAR(120) CHARACTER SET WIN1252)) AS ESP_NOME
-  FROM MARCACAO M
-  LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
-  LEFT JOIN LOCAL L ON L.LOC_CODIGO = M.MAR_LOCAL
-  LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
-  ${whereClause}
-  ORDER BY M.MAR_DATA, M.MAR_HORA
-`;
-}
+FROM
+    MARCACAO M
+    LEFT JOIN MEDICO DC ON DC.MED_CODIGO = M.MAR_MEDICO
+    LEFT JOIN LOCAL L ON L.LOC_CODIGO = M.MAR_LOCAL
+    LEFT JOIN ESPECIALIDADE E ON E.ESP_CODIGO = M.MAR_ESP
+WHERE
+    M.MAR_CODIGO = 2024532
+ORDER BY
+    M.MAR_DATA,
+    M.MAR_HORA;
 
-cron.schedule('30 07 * * *', async () => {
+`;
+
+*/
+
+cron.schedule('32 08 * * *', async () => {
   console.log(`[PRODUÇÃO] Iniciando verificação diária de agendamentos...`);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -115,7 +170,7 @@ cron.schedule('30 07 * * *', async () => {
 
   const dayOfWeek = new Date().getDay();
   const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  
+
   console.log(`[INFO] Hoje é ${dayNames[dayOfWeek]} (${dayOfWeek})`);
   logLine(`Dia da semana: ${dayNames[dayOfWeek]}`);
 
@@ -126,7 +181,7 @@ cron.schedule('30 07 * * *', async () => {
   }
 
   const query = buildQuery();
-  
+
   if (!query) {
     console.log('[SKIP] Nenhum agendamento para processar hoje');
     logLine('Nenhum agendamento para processar hoje');
@@ -146,7 +201,7 @@ cron.schedule('30 07 * * *', async () => {
     }
 
     for (const r of rows) {
-      
+
       let nomePaciente = 'Paciente';
 
       if (r.nome_paciente && r.nome_paciente.trim() !== '') {
@@ -168,7 +223,7 @@ cron.schedule('30 07 * * *', async () => {
       }
 
       const celular = formatPhoneNumber(r.mar_cel);
-      // const celular ="5585989924921"; // Número de teste
+      // const celular = "5575982064309"; // Número de teste
 
       // if (!celular || celular.length < 13 || !r.mar_cel) {
       //   console.log(`[SKIP] Agendamento ${r.mar_codigo} - Telefone inválido: "${r.mar_cel}"`);
@@ -240,8 +295,22 @@ cron.schedule('30 07 * * *', async () => {
 
         } catch (err) {
           console.error(`[PRODUÇÃO] Erro ao enviar para ${celular}:`, err.message);
-          logLine(`❌ Falha ao enviar para ${celular} - ${err.message}`);
+
+          if (err.response) {
+            console.error(`[DETALHE] Status: ${err.response.status}`);
+            console.error(`[DETALHE] Data:`, JSON.stringify(err.response.data, null, 2));
+            console.error(`[DETALHE] Headers:`, JSON.stringify(err.response.headers, null, 2));
+
+            logLine(`❌ Falha ao enviar para ${celular} - STATUS ${err.response.status} - ${JSON.stringify(err.response.data)}`);
+          } else if (err.request) {
+            console.error(`[DETALHE] Nenhuma resposta recebida:`, err.request);
+            logLine(`❌ Falha ao enviar para ${celular} - Nenhuma resposta recebida do servidor`);
+          } else {
+            console.error(`[DETALHE] Erro interno:`, err);
+            logLine(`❌ Falha ao enviar para ${celular} - Erro interno: ${err.message}`);
+          }
         }
+
 
       } catch (err) {
         console.error(`[PRODUÇÃO] Erro ao processar contato ${celular}:`, err.message);

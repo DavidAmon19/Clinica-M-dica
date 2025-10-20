@@ -14,15 +14,17 @@ const ACOES = {
 };
 
 async function processarAcaoWhatsapp(req, res) {
-  const { codigo, acao, motivo, nova_data, nova_hora } = req.body;
+  const { codigo, acao } = req.body;
 
   if (!codigo) {
     return res.status(400).json({ error: 'Código da marcação é obrigatório.' });
   }
 
-  if (!acao || !Object.values(ACOES).includes(acao)) {
-    return res.status(400).json({ 
-      error: 'Ação inválida. Use: confirmar, cancelar ou reagendar' 
+  const acaoFinal = acao || req.path.replace('/', '').trim().toLowerCase();
+
+  if (!acaoFinal || !Object.values(ACOES).includes(acaoFinal)) {
+    return res.status(400).json({
+      error: 'Ação inválida ou ausente. Use: confirmar, cancelar ou reagendar.'
     });
   }
 
@@ -49,15 +51,15 @@ async function processarAcaoWhatsapp(req, res) {
       return res.status(404).json({ error: 'Agendamento não encontrado.' });
     }
 
-    switch (acao) {
+    switch (acaoFinal) {
       case ACOES.CONFIRMAR:
         return await confirmarPresenca(marcacao, res);
 
       case ACOES.CANCELAR:
-        return await cancelarAgendamento(marcacao, motivo, res);
+        return await cancelarAgendamento(marcacao, res);
 
       case ACOES.REAGENDAR:
-        return await reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, res);
+        return await reagendarAgendamento(marcacao, res);
 
       default:
         return res.status(400).json({ error: 'Ação não implementada.' });
@@ -70,12 +72,8 @@ async function processarAcaoWhatsapp(req, res) {
 }
 
 async function confirmarPresenca(marcacao, res) {
-  
-
   if (marcacao.mar_ligou === STATUS_WHATSAPP.CONFIRMADO_WHATSAPP) {
-    let ePrimeiraConfirmacao = false;
-    const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao);
-    
+    const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, false);
     return res.status(200).send(mensagemConfirmacao);
   }
 
@@ -91,15 +89,13 @@ async function confirmarPresenca(marcacao, res) {
      WHERE MAR_CODIGO = ?
   `, [STATUS_WHATSAPP.CONFIRMADO_WHATSAPP, marcacao.mar_codigo]);
 
-  console.log(`[CONFIRMAÇÃO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Status: ${marcacao.mar_ligou} → ${STATUS_WHATSAPP.CONFIRMADO_WHATSAPP}`);
+  console.log(`[CONFIRMAÇÃO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Status atualizado para ${STATUS_WHATSAPP.CONFIRMADO_WHATSAPP}`);
   
-  let ePrimeiraConfirmacao = true;
-  const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao);
-
+  const mensagemConfirmacao = gerarMensagemConfirmacao(marcacao, true);
   return res.status(200).send(mensagemConfirmacao);
 }
 
-async function cancelarAgendamento(marcacao, motivo, res) {
+async function cancelarAgendamento(marcacao, res) {
   if (marcacao.mar_ligou === STATUS_WHATSAPP.CANCELADO_WHATSAPP) {
     return res.status(400).json({
       error: 'Este agendamento já foi cancelado anteriormente.',
@@ -113,7 +109,7 @@ async function cancelarAgendamento(marcacao, motivo, res) {
      WHERE MAR_CODIGO = ?
   `, [STATUS_WHATSAPP.CANCELADO_WHATSAPP, marcacao.mar_codigo]);
 
-  console.log(`[CANCELAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Motivo: ${motivo || 'Não informado'}`);
+  console.log(`[CANCELAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente}`);
 
   return res.status(200).json({
     success: true,
@@ -121,8 +117,8 @@ async function cancelarAgendamento(marcacao, motivo, res) {
     dados: {
       codigo: marcacao.mar_codigo,
       paciente: marcacao.nome_paciente,
-      data: marcacao.mar_data,
-      motivo: motivo || null
+      data: formatarData(marcacao.mar_data),
+      hora: normalizarHora(marcacao.mar_hora)
     },
     debug: {
       status_anterior: marcacao.mar_ligou,
@@ -131,7 +127,7 @@ async function cancelarAgendamento(marcacao, motivo, res) {
   });
 }
 
-async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, res) {
+async function reagendarAgendamento(marcacao, res) {
   if (marcacao.mar_ligou === STATUS_WHATSAPP.REMARCADO_WHATSAPP) {
     return res.status(400).json({
       error: 'Este agendamento já foi remarcado anteriormente.',
@@ -139,25 +135,13 @@ async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, 
     });
   }
 
-  let updateQuery = 'UPDATE MARCACAO SET MAR_LIGOU = ?';
-  let params = [STATUS_WHATSAPP.REMARCADO_WHATSAPP];
+  await queryDB(`
+    UPDATE MARCACAO
+       SET MAR_LIGOU = ?
+     WHERE MAR_CODIGO = ?
+  `, [STATUS_WHATSAPP.REMARCADO_WHATSAPP, marcacao.mar_codigo]);
 
-  if (nova_data) {
-    updateQuery += ', MAR_DATA = ?';
-    params.push(nova_data);
-  }
-
-  if (nova_hora) {
-    updateQuery += ', MAR_HORA = ?';
-    params.push(nova_hora);
-  }
-
-  updateQuery += ' WHERE MAR_CODIGO = ?';
-  params.push(marcacao.mar_codigo);
-
-  await queryDB(updateQuery, params);
-
-  console.log(`[REAGENDAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente} - Nova data: ${nova_data || 'não informada'} - Motivo: ${motivo || 'Não informado'}`);
+  console.log(`[REAGENDAMENTO] ${marcacao.mar_codigo} - ${marcacao.nome_paciente}`);
 
   return res.status(200).json({
     success: true,
@@ -165,11 +149,8 @@ async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, 
     dados: {
       codigo: marcacao.mar_codigo,
       paciente: marcacao.nome_paciente,
-      data_anterior: marcacao.mar_data,
-      hora_anterior: marcacao.mar_hora,
-      nova_data: nova_data || marcacao.mar_data,
-      nova_hora: nova_hora || marcacao.mar_hora,
-      motivo: motivo || null
+      data_anterior: formatarData(marcacao.mar_data),
+      hora_anterior: normalizarHora(marcacao.mar_hora)
     },
     debug: {
       status_anterior: marcacao.mar_ligou,
@@ -178,42 +159,40 @@ async function reagendarAgendamento(marcacao, { nova_data, nova_hora, motivo }, 
   });
 }
 
-function extrairLinkDoEndereco(endereco) {
-  if (!endereco) return null;
-  
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const matches = endereco.match(urlRegex);
-  
-  if (matches && matches.length > 0) {
-    return matches[0];
-  }
-  
-  return null;
+function normalizarHora(hora) {
+  if (!hora) return '';
+  return Buffer.isBuffer(hora) ? hora.toString('utf8').trim() : String(hora).trim();
 }
 
+function formatarData(data) {
+  if (!data) return null;
+  if (data instanceof Date) return data.toISOString();
+  return data;
+}
 
-function removeLocalizacao(endereco){
-   const index = endereco.toLowerCase().indexOf("localização");
-    if (index !== -1) {
-      return endereco.substring(0, index).trim();
-    }
-    return endereco;
+function extrairLinkDoEndereco(endereco) {
+  if (!endereco) return null;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const matches = endereco.match(urlRegex);
+  return matches?.[0] || null;
+}
+
+function removeLocalizacao(endereco) {
+  const index = endereco.toLowerCase().indexOf("localização");
+  return index !== -1 ? endereco.substring(0, index).trim() : endereco;
 }
 
 function gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao) {
   const data = marcacao.mar_data ? new Date(marcacao.mar_data).toLocaleDateString('pt-BR') : '';
-  const hora = Buffer.isBuffer(marcacao.mar_hora)
-    ? marcacao.mar_hora.toString('utf8')
-    : (marcacao.mar_hora || '');
+  const hora = normalizarHora(marcacao.mar_hora);
   const local = marcacao.local_nome || '';
   const medico = marcacao.medico_nome || '';
   const endereco = marcacao.local_endereco || '';
   const link = extrairLinkDoEndereco(endereco);
-  const enderecoSemLocalizacao = removeLocalizacao(endereco)
+  const enderecoSemLocalizacao = removeLocalizacao(endereco);
 
   let mensagem = '✅ *Presença Confirmada com Sucesso!*\n\n';
-  
-  if(!ePrimeiraConfirmacao){
+  if (!ePrimeiraConfirmacao) {
     mensagem += '_Sua presença já havia sido confirmada anteriormente._\n\n';
   }
 
@@ -225,7 +204,7 @@ function gerarMensagemConfirmacao(marcacao, ePrimeiraConfirmacao) {
   if (link) mensagem += `🗺️ *Como Chegar:* ${link}\n`;
   mensagem += '\n⚠️ *IMPORTANTE:* Chegue com 20 minutos de antecedência!';
 
-  return mensagem
+  return mensagem;
 }
 
 module.exports = { 
