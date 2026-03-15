@@ -210,7 +210,7 @@ cron.schedule('00 08 * * *', async () => {
       }
 
       const celular = formatPhoneNumber(r.mar_cel);
-      // const celular ="5585992616996"; // Número de teste
+      // const celular = "5585992616996"; // Número de teste
 
       // if (!celular || celular.length < 13 || !r.mar_cel) {
       //   console.log(`[SKIP] Agendamento ${r.mar_codigo} - Telefone inválido: "${r.mar_cel}"`);
@@ -293,7 +293,20 @@ cron.schedule('00 08 * * *', async () => {
 
         } catch (err) {
           console.error(`[PRODUÇÃO] Erro ao enviar para ${celular}:`, err.message);
-          logLine(`❌ Falha ao enviar para ${celular} - ${err.message}`);
+
+          if (err.response) {
+            console.error(`[DETALHE] Status: ${err.response.status}`);
+            console.error(`[DETALHE] Data:`, JSON.stringify(err.response.data, null, 2));
+            console.error(`[DETALHE] Headers:`, JSON.stringify(err.response.headers, null, 2));
+
+            logLine(`❌ Falha ao enviar para ${celular} - STATUS ${err.response.status} - ${JSON.stringify(err.response.data)}`);
+          } else if (err.request) {
+            console.error(`[DETALHE] Nenhuma resposta recebida:`, err.request);
+            logLine(`❌ Falha ao enviar para ${celular} - Nenhuma resposta recebida do servidor`);
+          } else {
+            console.error(`[DETALHE] Erro interno:`, err);
+            logLine(`❌ Falha ao enviar para ${celular} - Erro interno: ${err.message}`);
+          }
         }
 
       } catch (err) {
