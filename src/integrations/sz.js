@@ -124,6 +124,7 @@ async function getOrCreateContact(phone, patientName) {
 async function updateContactSZ(contactId, data) {
     try {
         let token = await getForticsToken();
+        
         const response = await axios({
             method: 'put',
             url: `${process.env.FORTICS_BASE_URL}/api/v4/contacts/update_fields/${contactId}`,

@@ -19,7 +19,9 @@ const marcacaoRoutes = require('./src/routes/marcacao');
 const cancelarRoutes = require('./src/routes/cancelar');
 const forticsWebhook = require('./src/routes/forticsWebhook');
 const dashboardRoutes = require('./src/routes/dashboardRoutes');
+const npsRoutes = require('./src/routes/npsRoutes');
 
+app.use('/api', npsRoutes);
 app.use('/api', express.json({limit: '2mb'}), forticsWebhook);
 app.use('/api/medico', medicoRoutes);
 app.use('/api/convenio', convenioRoutes);
